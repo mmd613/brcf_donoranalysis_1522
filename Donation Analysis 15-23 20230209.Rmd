@@ -1,0 +1,181 @@
+---
+title: "YE Long Analysis"
+output: html_document
+date: "2023-02-09"
+author: "Mario Mercado Diaz"
+---
+
+
+library(dplyr)
+library(summarytools)
+library(readxl)
+library(lubridate)
+library(ggplot2)
+library(tidyverse)
+library(knitr)
+library(viridis)
+library(formattable)
+library(zoo)
+
+options(digits=5)
+options(scipen=999)
+
+#Loading Data from Exceed
+
+Original_Donation_Data_15_23 <- read_excel("~/20230302 Donation data Jan15-Dec22.xlsx")
+View(Original_Donation_Data_15_23)
+
+DonData1522 <- Original_Donation_Data_15_23
+
+
+#Cleaning through data and preparing it for Analysis 
+
+DonData1522$GiftDate <- as.Date(DonData1522$GiftDate) #Formatting gift dates
+view(DonData1522$GiftDate)
+
+DonData1522$AckDate <- as.Date(DonData1522$AckDate) #Formatting ack dates
+view(DonData1522$AckDate)
+
+DonData1522$EntryDate <- as.Date(DonData1522$EntryDate) #Formatting entry dates
+view(DonData1522$EntryDate)
+
+DonData1522$year <- strftime(DonData1522$GiftDate, "%Y")    # Create year column
+DonData1522$month <- months(DonData1522$GiftDate, abbreviate = FALSE)   # Create month column
+
+
+monthly_donavg <- DonData1522 %>%
+  group_by(year,month) %>%
+  summarise(month_average = mean(Amount)) %>% 
+  dplyr::mutate_if(is.numeric, format, 2)
+
+formattable(monthly_donavg)
+
+#Analysis
+
+month_freq_1522 <- ggplot(DonData1522) + #Amount of Gifts per Month
+  aes(x = lubridate::floor_date(GiftDate, "month")) + 
+  geom_bar() +
+  ggtitle("Amount of Gifts per Month") +
+  ylab("Amount of Gifts") +
+  xlab("Month") +
+  theme(plot.title = element_text(hjust = 0.5))
+  
+
+year_freq_1522 <- ggplot(DonData1522) + #Amount of Gifts per Year
+  aes(x = lubridate::floor_date(GiftDate, "year")) + 
+  geom_bar(stat = "count", fill = "red") +
+  ggtitle("Number of Gifts per Year (2015-2022)") +
+  ylab("No. of Gifts") +
+  xlab("Year") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+totalamountyr_sumdata1522 <- DonData1522 %>% #Total raised per Year
+  filter(FundCode == "40101") %>% 
+  group_by(year) %>%
+  summarise(total = sum(Amount))
+  
+tot_gifts_yr_1522 <- ggplot(totalamountyr_sumdata1522, aes(year,total))+ 
+  geom_col(fill="red") +
+  ylab("Total Raised $") +
+  xlab("Year") +
+  ggtitle("Total Raised by Individual Donors per Year") +
+  theme(plot.title = element_text(hjust = 0.5),
+  axis.text.x = element_text(angle = 65, hjust = 1, face="bold"))
+
+bxplot_1522 <- boxplot(Amount ~ year, 
+  outline = FALSE,
+  data = DonData1522,
+  varwidth = TRUE, 
+  main = "Dispersion of Donation Amounts by Year",
+  xlab = "Year",
+  ylab = "Donation Amount ($)"
+  )
+
+indvdonation_data1522 <- DonData1522 %>% 
+  filter(FundCode == "40101")
+  
+boxplot(Amount ~ year, 
+  outline = FALSE,
+  data = indvdonation_data1522,
+  main = "Dispersion of Donation Amounts by Year (Individual Donors)",
+  xlab = "Year",
+  ylab = "Donation Amount ($)"
+  )
+
+freqgifts_method1522 <- DonData1522 %>%
+ggplot(DonData1522, mapping=aes(x=year, 
+  outline = FALSE, fill = Method)) + 
+  geom_histogram(stat = "count") +
+  ylab("Amount of Gifts") +
+  xlab("Year") +
+  geom_density(stat = "count") + 
+  ggtitle("Number of Gifts by Method per Year") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_viridis(discrete=TRUE, option="A")
+
+  
+  
+##Describing reason by year
+
+reason_ranks <- DonData1522 %>%
+    group_by(year, Reason) %>%
+    summarise(count = n()) %>%
+    top_n(n = 5, wt = count)
+
+write.csv(reason_ranks, "C:\\Users\\MarioMercado-Diaz\\OneDrive - Bread & Roses Community Fund\\Documents\\Top Reasons by year1522.csv", row.names = FALSE)
+
+    
+reason_ranks_yr <- ggplot(DonData1522) +
+  aes(x = Reason) +
+  geom_bar ()+
+  ggtitle("Amount of Gifts by Method per Year (2015-2022)") +
+  ylab("Amount of Gifts") +
+  xlab("Year") +
+  geom_density(stat = "count") + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  facet_wrap(~year)
+
+most_reasons <- subset(Gift_Analysis_Dec21_22, Reason == c("520 - Development General", "420 - Community Events General", "140 - Gender Justice Organizing GP", "410 - Tribute to Change", "510 - Workplace Campaigns"))
+
+
+most_reasons %>%
+ggplot(reason_ranks, mapping = aes(x=count), fill = Reason) +
+  geom_bar() +
+  ylab("Amount of Gifts") +
+  xlab("Year") +
+  ggtitle("Amount of Gifts each Month by Reason")+ 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  facet_wrap(~year)
+
+
+reason_totamount <- DonData1522 %>%
+    group_by(year, Reason) %>%
+    summarise(total = sum(Amount)) %>%
+    top_n(n = 5, wt = total)
+
+write.csv(reason_totamount, "C:\\Users\\MarioMercado-Diaz\\OneDrive - Bread & Roses Community Fund\\Documents\\Tot Amount Reasons by year1522.csv", row.names = FALSE)
+
+
+
+
+#Donor analysis 
+
+household_data1523 <- DonData1523[DonData1523$HOType=="Household",]
+
+top100_house <- household_data1523 %>%
+    group_by(EntityID, Name) %>%
+    summarise(sum(Amount)) %>% 
+    
+write.csv(top100_house, "C:\\Users\\MarioMercado-Diaz\\OneDrive - Bread & Roses Community Fund\\Documents\\Top 100 Donors.csv", row.names = FALSE)
+
+
+
+
+
+
+
+
+
+
+  
+  
